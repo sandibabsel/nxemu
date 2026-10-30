@@ -1,7 +1,7 @@
 name: Build NxEmu Android APK
 
 on:
-  workflow_dispatch: # Memungkinkan Anda memicu build secara manual
+  workflow_dispatch:
   push:
     branches: [ "master" ]
 
@@ -25,34 +25,39 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # 3. Siapkan Android SDK, NDK, dan Dependensi Sistem (Termasuk glslang)
+      # 3. Siapkan Android SDK, NDK, dan Dependensi Sistem
       - name: Setup Android SDK & NDK
         run: |
-          # Update dan instal dependensi build sistem + glslang-tools (untuk glslangValidator)
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build glslang-tools libvulkan-dev
-          
-          # Setujui semua lisensi Android SDK secara otomatis
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          
-          # Instal NDK dan komponen SDK spesifik yang dibutuhkan NxEmu
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;30.0.16248370" "platforms;android-36" "build-tools;35.0.0"
 
-      # 4. Terapkan patch konversi tipe data (agar build stabil di compiler baru)
+      # 4. Terapkan patch konversi tipe data
       - name: Apply texture_pass.cpp patch
         run: |
           sed -i 's/inst->Arg(1).U32() \* sizeof(u32)/inst->Arg(1).U32() * (u32)sizeof(u32)/g' src/yuzu_shader_recompiler/ir_opt/texture_pass.cpp || true
 
-      # 5. Jalankan skrip build Android bawaan NxEmu
+      # 5. Jalankan skrip build Android
       - name: Build Android APK
         run: |
           chmod +x src/script/build_android.sh
           sh src/script/build_android.sh Release
 
-      # 6. Unggah hasil APK sebagai Artifact agar bisa diunduh
+      # 6. LANGKAH DEBUG: Cari file APK di seluruh direktori kerja
+      - name: Debug: Find generated APKs
+        run: |
+          echo "--- Mencari semua file APK di workspace ---"
+          find . -name "*.apk" -type f || true
+          echo "--- Memeriksa direktori output Gradle ---"
+          ls -laR src/android/app/build/outputs/apk/ || echo "Direktori tidak ditemukan"
+
+      # 7. Unggah hasil APK sebagai Artifact (dengan pola pencarian yang lebih luas)
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: NxEmu-Android-Release-APK
-          path: src/android/app/build/outputs/apk/release/*.apk
+          path: |
+            src/android/app/build/outputs/apk/**/*.apk
+            build/android/**/*.apk
           if-no-files-found: error
