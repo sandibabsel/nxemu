@@ -25,12 +25,12 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # 3. Siapkan Android SDK & NDK (Menggunakan SDK bawaan GitHub Runner)
+      # 3. Siapkan Android SDK, NDK, dan Dependensi Sistem (Termasuk glslang)
       - name: Setup Android SDK & NDK
         run: |
-          # Install dependensi build sistem
+          # Update dan instal dependensi build sistem + glslang-tools (untuk glslangValidator)
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build
+          sudo apt-get install -y cmake ninja-build glslang-tools libvulkan-dev
           
           # Setujui semua lisensi Android SDK secara otomatis
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
@@ -38,7 +38,7 @@ jobs:
           # Instal NDK dan komponen SDK spesifik yang dibutuhkan NxEmu
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;30.0.16248370" "platforms;android-36" "build-tools;35.0.0"
 
-      # 4. Terapkan patch konversi tipe data (agar build stabil)
+      # 4. Terapkan patch konversi tipe data (agar build stabil di compiler baru)
       - name: Apply texture_pass.cpp patch
         run: |
           sed -i 's/inst->Arg(1).U32() \* sizeof(u32)/inst->Arg(1).U32() * (u32)sizeof(u32)/g' src/yuzu_shader_recompiler/ir_opt/texture_pass.cpp || true
@@ -49,7 +49,7 @@ jobs:
           chmod +x src/script/build_android.sh
           sh src/script/build_android.sh Release
 
-      # 6. Unggah hasil APK sebagai Artifact
+      # 6. Unggah hasil APK sebagai Artifact agar bisa diunduh
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
